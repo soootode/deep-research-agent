@@ -33,6 +33,7 @@ llm = ChatGroq(
     model="openai/gpt-oss-120b",
     temperature=0.2,
     groq_api_key=GROQ_API_KEY,
+    max_tokens=8000,  # جلوگیری از قطع‌شدن گزارش‌های بلند و چندبخشی وسط راه
 )
 
 # کلید را مستقیم به ولیدیتور pydantic پاس می‌دهیم تا وابسته به خواندن
@@ -106,17 +107,21 @@ def researcher_agent(topic: str) -> str:
 def editor_agent(topic: str, notes: str, feedback: str = "") -> str:
     """ایجنت ۲: سردبیر و منتقد ارشد — گزارش راهبردی ساختاریافته تدوین می‌کند."""
     prompt = f"""شما سردبیر ارشد و منتقد یک نشریه تخصصی اقتصادی/فناوری هستید.
-بر اساس یادداشت‌های محقق زیر، یک گزارش راهبردی رسمی درباره «{topic}» دقیقاً با این ساختار تدوین کنید:
+بر اساس یادداشت‌های محقق زیر، یک گزارش راهبردی رسمی درباره «{topic}» دقیقاً و **فقط** با این
+چهار بخش تدوین کنید (بخش اضافه‌ای مثل مرور تاریخی، روش‌شناسی جداگانه یا چند جدول پشت‌سرهم اضافه نکنید):
 
 ## چکیده اجرایی
 ## جدول سناریوها و آمار کلیدی
 ## تحلیل روندها
 ## نتیجه‌گیری و پیشنهاد راهبردی
 
-نکات مهم برای جدول:
-- جدول را با سینتکس استاندارد مارک‌داون بنویس.
+نکات مهم:
+- گزارش را مختصر و فشرده نگه دار؛ هر بخش حداکثر چند پاراگراف یا یک جدول کوتاه باشد.
+- جدول را با سینتکس استاندارد مارک‌داون بنویس و آن را حداکثر در ۵-۶ ردیف نگه دار.
 - هر سلول جدول باید کوتاه و تک‌خطی باشد؛ هرگز داخل جدول از تگ HTML (مثل <br>) یا بک‌تیک
   استفاده نکن. اگر چند نکته برای یک سلول داری، آن‌ها را با ویرگول یا نقطه‌ویرگول در یک خط بنویس.
+- مهم‌ترین قانون: گزارش باید همیشه کامل و با نتیجه‌گیری واقعی پایان یابد؛ هرگز وسط یک جمله،
+  جدول یا فرمت مارک‌داون (مثل ** باز بدون بسته شدن) قطع نشود.
 
 یادداشت‌های محقق:
 {notes}
@@ -126,6 +131,18 @@ def editor_agent(topic: str, notes: str, feedback: str = "") -> str:
 """
     res = llm.invoke([HumanMessage(content=prompt)])
     return res.content
+
+
+def _looks_truncated(text: str) -> bool:
+    """تشخیص ساده‌ی گزارش‌های ناقص‌مانده (مثل ** باز نشده یا جدول نصفه)."""
+    stripped = text.strip()
+    if not stripped:
+        return True
+    if stripped.count("**") % 2 != 0:
+        return True
+    if stripped.endswith(("|", "-", "**", "،", ":")):
+        return True
+    return False
 
 
 # ====================================================
@@ -282,6 +299,28 @@ st.markdown(
             text-align: right !important;
         }
         section[data-testid="stSidebar"] { direction: rtl !important; }
+
+        /* رفع فاصله‌ی نامتقارن بین نشانه‌ی لیست (•) و متن در حالت راست‌چین */
+        .stApp ul, .stApp ol {
+            padding-right: 1.4em !important;
+            padding-left: 0 !important;
+            margin-right: 0 !important;
+        }
+        .stApp li {
+            margin-bottom: 6px;
+            padding-right: 0.2em;
+        }
+
+        /* فاصله‌ی بیشتر بین دو ستون اصلی صفحه، به‌همراه یک خط جداکننده‌ی ظریف */
+        div[data-testid="stHorizontalBlock"] {
+            gap: 3rem;
+        }
+        div[data-testid="column"] {
+            background-color: #141f38;
+            border-radius: 12px;
+            padding: 20px 24px;
+            border: 1px solid #253148;
+        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -298,7 +337,8 @@ if "notes" not in st.session_state:
 if "draft" not in st.session_state:
     st.session_state.draft = ""
 
-col1, col2 = st.columns([1, 1])
+
+col1, col2 = st.columns([1, 1], gap="large")
 
 # ستون ۱: ایجنت محقق
 with col1:
@@ -324,6 +364,11 @@ with col2:
     st.subheader("🧐 ۲. ایجنت سردبیر و منتقد ارشد (Editor Agent)")
 
     if st.session_state.draft:
+        if _looks_truncated(st.session_state.draft):
+            st.warning(
+                "⚠️ به‌نظر می‌رسد گزارش وسط راه قطع شده (مثلاً یک جدول یا جمله نصفه مونده). "
+                "پیشنهاد می‌شه دکمه‌ی «بازنویسی توسط سردبیر» رو بدون فیدبک خاصی بزنی تا دوباره کامل تولید بشه."
+            )
         st.markdown("### 📄 پیش‌نویس گزارش تدوین‌شده:")
         st.write(st.session_state.draft)
 

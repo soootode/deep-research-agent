@@ -103,6 +103,8 @@ def researcher_agent(topic: str) -> str:
 - اگر نتایج خام برای موضوع خواسته‌شده ناکافی یا کلی هستند، همین را صادقانه در ابتدای
   یادداشت اعلام کن؛ کیفیت پایین دیتا مهم‌تر از کامل به‌نظر رسیدنِ یادداشت است.
 - برای هر رقم یا آمار، نام دقیق منبعش (دامنه یا عنوان نتیجه) را کنار همان رقم بیاور.
+- هر لینک منبع را به‌صورت لینک کوتاه مارک‌داون بنویس، مثلاً: `[iranjib.ir](https://...)`،
+  نه به‌صورت متن خام طولانی مثل `iranjib.ir (https://www.iranjib.ir/showgroup/...)`.
 
 کوئری جستجوی استفاده‌شده: {query}
 
@@ -337,6 +339,26 @@ st.markdown(
             border-radius: 12px;
             padding: 20px 24px;
             border: 1px solid #253148;
+            overflow-x: hidden;
+        }
+
+        /* رفع مشکل بیرون‌زدن لینک‌ها و متن‌های طولانی بدون فاصله (مثل URL خام)
+           از عرض ستون، که باعث overlap شدن روی ستون کناری می‌شد */
+        div[data-testid="column"] * {
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+        }
+        div[data-testid="column"] a {
+            word-break: break-all !important;
+        }
+        div[data-testid="stMarkdownContainer"] table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        div[data-testid="stMarkdownContainer"] table td,
+        div[data-testid="stMarkdownContainer"] table th {
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
         }
     </style>
     """,

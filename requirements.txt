@@ -1,6 +1,8 @@
-streamlit
+﻿streamlit
 langchain-groq
 langchain-core
+langchain-community
+google-search-results
 duckduckgo-search
 markdown
 python-dotenv
